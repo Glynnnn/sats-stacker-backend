@@ -10,8 +10,6 @@ const app = express();
 const PORT = 3000;
 const API_KEY = process.env.API_KEY;
 
-console.log(API_KEY);
-
 function getPriceFromCache(date) {
   const row = db
     .prepare("SELECT price_data, timestamp FROM btc_price_cache WHERE date = ?")
