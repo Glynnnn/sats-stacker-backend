@@ -2,11 +2,15 @@
 import express from "express";
 import fetch from "node-fetch"; // or built-in fetch if Node >=18
 import cors from "cors";
-import db from "./db";
+import db from "./db.js";
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const API_KEY = process.env.COINGECKO_API_KEY || "CG-uyVpB4M8BmHwR9625TqAdNcD";
+const API_KEY = process.env.API_KEY;
+
+console.log(API_KEY);
 
 function getPriceFromCache(date) {
   const row = db

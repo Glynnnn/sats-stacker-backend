@@ -1,8 +1,11 @@
 // db.js
 import Database from "better-sqlite3";
 import path from "path";
+import { fileURLToPath } from "url";
 
-// Save DB file to disk in project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const db = new Database(path.resolve(__dirname, "addresses.db"));
 
 // Create table if not exists
