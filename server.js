@@ -8,6 +8,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
 const API_KEY = process.env.API_KEY;
 
 function getPriceFromCache(date) {
@@ -54,7 +55,12 @@ app.get("/btc-data", async (req, res) => {
     const currencyParams = currencies.join(",");
 
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencyParams}&include_market_cap=true&include_24hr_change=true&x_cg_demo_api_key=${API_KEY}`
+      `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencyParams}&include_market_cap=true&include_24hr_change=true`,
+      {
+        headers: {
+          x_cg_demo_api_key: API_KEY,
+        },
+      }
     );
 
     if (!response.ok) {
@@ -106,7 +112,12 @@ app.get("/btc-price-history/:date", async (req, res) => {
 
     // Not cached, fetch from CoinGecko
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/bitcoin/history?date=${date}&localization=false&x_cg_demo_api_key=${apiKey}`
+      `https://api.coingecko.com/api/v3/coins/bitcoin/history?date=${date}&localization=false`,
+      {
+        headers: {
+          x_cg_demo_api_key: API_KEY,
+        },
+      }
     );
     if (!response.ok) {
       throw new Error(`CoinGecko responded with status ${response.status}`);
