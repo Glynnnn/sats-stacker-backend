@@ -118,6 +118,7 @@ app.get("/btc-price-history/:date", async (req, res) => {
     : supportedCurrencies;
 
   try {
+    console.log("Trying to get historical data");
     // Use combined currency key for cache
     const cacheKey = `${date}-${currenciesToReturn.join(",")}`;
     const cached = getPriceFromCache(cacheKey);
@@ -133,7 +134,7 @@ app.get("/btc-price-history/:date", async (req, res) => {
     if (!response.ok) {
       throw new Error(`CoinGecko responded with status ${response.status}`);
     }
-
+    console.log("Response: " + response);
     const data = await response.json();
     const allPrices = data?.market_data?.current_price;
 
