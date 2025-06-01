@@ -99,6 +99,7 @@ app.get("/btc-data", async (req, res) => {
 
 // get historical btc price data then cache in db for 24 hours
 app.get("/btc-price-history/:date", async (req, res) => {
+  console.log("Get historical data");
   const date = req.params.date; // e.g. "19-05-2025"
   const currencyParam = req.query.currency?.toString().toLowerCase();
   const supportedCurrencies = ["usd", "aud", "cad", "eur", "gbp"];
