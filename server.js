@@ -25,6 +25,14 @@ function getPriceFromCache(date) {
   return null;
 }
 
+function pruneOldCacheEntries(maxAgeMs = 24 * 60 * 60 * 1000) {
+  const cutoff = Date.now() - maxAgeMs;
+  const deleted = db
+    .prepare("DELETE FROM btc_price_cache WHERE timestamp < ?")
+    .run(cutoff);
+  console.log(`Pruned ${deleted.changes} old cache entries`);
+}
+
 function savePriceToCache(date, priceData) {
   const timestamp = Date.now();
   db.prepare(
@@ -42,11 +50,14 @@ let cachedBtcData = null;
 let lastFetchTime = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
+setInterval(() => pruneOldCacheEntries(), 60 * 60 * 5000); // every 5 hours
+
 // get current btc price data
 app.get("/btc-data", async (req, res) => {
   const now = Date.now();
   if (cachedBtcData && now - lastFetchTime < CACHE_DURATION_MS) {
     // Return cached data if still valid
+    console.log("Price from cache");
     return res.json(cachedBtcData);
   }
 
@@ -55,18 +66,13 @@ app.get("/btc-data", async (req, res) => {
     const currencyParams = currencies.join(",");
 
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencyParams}&include_market_cap=true&include_24hr_change=true`,
-      {
-        headers: {
-          x_cg_demo_api_key: API_KEY,
-        },
-      }
+      `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=${currencyParams}&include_market_cap=true&include_24hr_change=true&x_cg_demo_api_key=${API_KEY}`
     );
 
     if (!response.ok) {
       throw new Error(`CoinGecko API error: ${response.statusText}`);
     }
-
+    console.log("Price from API");
     const data = await response.json();
 
     // Format response same as your frontend expects
@@ -93,44 +99,73 @@ app.get("/btc-data", async (req, res) => {
 
 // get historical btc price data then cache in db for 24 hours
 app.get("/btc-price-history/:date", async (req, res) => {
-  // Expecting date param in dd-mm-yyyy format, e.g. 19-05-2025
-  const date = req.params.date;
+  const date = req.params.date; // e.g. "19-05-2025"
+  const currencyParam = req.query.currency?.toString().toLowerCase();
+  const supportedCurrencies = ["usd", "aud", "cad", "eur", "gbp"];
 
-  // Validate date format (basic check)
+  // Validate date format (dd-mm-yyyy)
   if (!/^\d{2}-\d{2}-\d{4}$/.test(date)) {
     return res
       .status(400)
       .json({ error: "Invalid date format. Use dd-mm-yyyy." });
   }
 
+  // Determine if user requested a single supported currency or all
+  const isSingleCurrency =
+    currencyParam && supportedCurrencies.includes(currencyParam);
+  const currenciesToReturn = isSingleCurrency
+    ? [currencyParam]
+    : supportedCurrencies;
+
   try {
-    // Check cache first
-    const cached = getPriceFromCache(date);
+    // Use combined currency key for cache
+    const cacheKey = `${date}-${currenciesToReturn.join(",")}`;
+    const cached = getPriceFromCache(cacheKey);
     if (cached) {
       return res.json(cached);
     }
 
-    // Not cached, fetch from CoinGecko
+    // Fetch from CoinGecko
     const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/bitcoin/history?date=${date}&localization=false`,
-      {
-        headers: {
-          x_cg_demo_api_key: API_KEY,
-        },
-      }
+      `https://api.coingecko.com/api/v3/coins/bitcoin/history?date=${date}&localization=false&x_cg_demo_api_key=${API_KEY}`
     );
+
     if (!response.ok) {
       throw new Error(`CoinGecko responded with status ${response.status}`);
     }
 
     const data = await response.json();
+    const allPrices = data?.market_data?.current_price;
 
-    // Cache it for next time
-    savePriceToCache(date, data);
+    if (!allPrices) {
+      return res
+        .status(400)
+        .json({ error: "Price data not available for this date" });
+    }
 
-    return res.json(data);
+    // Extract and filter only supported currencies
+    const filteredPrices = {};
+    for (const currency of currenciesToReturn) {
+      if (allPrices[currency]) {
+        filteredPrices[currency] = allPrices[currency];
+      }
+    }
+
+    if (Object.keys(filteredPrices).length === 0) {
+      return res
+        .status(400)
+        .json({ error: "No supported currencies found for this date" });
+    }
+
+    const result = {
+      date,
+      prices: filteredPrices,
+    };
+
+    savePriceToCache(cacheKey, result);
+    return res.json(result);
   } catch (error) {
-    console.error("Error fetching historical BTC price:", error);
+    console.error("Error fetching BTC historical price:", error);
     return res.status(500).json({ error: "Failed to fetch BTC price history" });
   }
 });
