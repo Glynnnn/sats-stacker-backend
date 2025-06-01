@@ -50,7 +50,7 @@ let cachedBtcData = null;
 let lastFetchTime = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000;
 
-setInterval(() => pruneOldCacheEntries(), 60 * 60 * 5000); // every 5 hours
+setInterval(() => pruneOldCacheEntries(), 5 * 60 * 60 * 1000); // every 5 hours
 
 // get current btc price data
 app.get("/btc-data", async (req, res) => {
